@@ -18,21 +18,30 @@ const AudioPlayer = ({ audioUrl, onEnded }: AudioPlayerProps) => {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.75);
   const [isMuted, setIsMuted] = useState(false);
+  const [audioLoaded, setAudioLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Reset state when audioUrl changes
   useEffect(() => {
     setIsPlaying(false);
     setIsPaused(false);
     setCurrentTime(0);
+    setAudioLoaded(false);
+    setError(null);
+    
+    // Log for debugging
+    console.log("Audio URL changed:", audioUrl);
   }, [audioUrl]);
 
   useEffect(() => {
     // Create new audio element
-    const audio = new Audio(audioUrl);
+    const audio = new Audio();
     audioRef.current = audio;
     
     const handleLoadedMetadata = () => {
       setDuration(audio.duration);
+      setAudioLoaded(true);
+      console.log("Audio metadata loaded, duration:", audio.duration);
     };
     
     const handleTimeUpdate = () => {
@@ -43,39 +52,67 @@ const AudioPlayer = ({ audioUrl, onEnded }: AudioPlayerProps) => {
       setIsPlaying(false);
       setCurrentTime(0);
       if (onEnded) onEnded();
+      console.log("Audio playback ended");
+    };
+    
+    const handleError = (e: ErrorEvent) => {
+      console.error("Audio error:", e);
+      setError("Failed to load audio. Please try again.");
+      setIsPlaying(false);
     };
     
     // Add event listeners
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
     audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("error", handleError as EventListener);
+    
+    // Set audio source and preload
+    audio.src = audioUrl;
+    audio.preload = "auto";
     
     // Set initial volume
     audio.volume = volume;
     
+    // Try to load the audio
+    audio.load();
+    console.log("Audio element created with src:", audioUrl);
+    
     // Cleanup function
     return () => {
+      console.log("Cleaning up audio element");
       audio.pause();
       audio.src = "";
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("error", handleError as EventListener);
     };
   }, [audioUrl, onEnded]);
   
   const togglePlayPause = () => {
-    if (!audioRef.current) return;
+    if (!audioRef.current) {
+      console.error("Audio element not available");
+      return;
+    }
+    
+    console.log("Toggle play/pause, current state:", isPlaying);
     
     if (isPlaying) {
       audioRef.current.pause();
       setIsPaused(true);
+      setIsPlaying(false);
+      console.log("Audio paused");
     } else {
-      // Explicitly set the current src again to ensure it's loaded
+      // Make sure the source is set
       if (!audioRef.current.src || audioRef.current.src !== audioUrl) {
+        console.log("Resetting audio source");
         audioRef.current.src = audioUrl;
+        audioRef.current.load();
       }
       
       // Play with a promise to catch any errors
+      console.log("Attempting to play audio");
       const playPromise = audioRef.current.play();
       
       if (playPromise !== undefined) {
@@ -83,22 +120,69 @@ const AudioPlayer = ({ audioUrl, onEnded }: AudioPlayerProps) => {
           .then(() => {
             setIsPaused(false);
             setIsPlaying(true);
+            console.log("Audio playing successfully");
           })
           .catch(error => {
             console.error("Play failed:", error);
-            // Try a fallback method for mobile devices
-            setTimeout(() => {
-              if (audioRef.current) {
-                audioRef.current.play()
-                  .then(() => {
-                    setIsPaused(false);
-                    setIsPlaying(true);
-                  })
-                  .catch(e => console.error("Fallback play failed:", e));
-              }
-            }, 100);
+            
+            // Special handling for base64 data URLs
+            if (audioUrl.startsWith('data:audio/')) {
+              console.log("Trying alternative method for base64 audio");
+              tryPlayBase64Audio(audioUrl);
+            } else {
+              // Try a fallback method for mobile devices
+              setTimeout(() => {
+                if (audioRef.current) {
+                  console.log("Trying fallback play method");
+                  audioRef.current.play()
+                    .then(() => {
+                      setIsPaused(false);
+                      setIsPlaying(true);
+                      console.log("Fallback play successful");
+                    })
+                    .catch(e => console.error("Fallback play failed:", e));
+                }
+              }, 100);
+            }
           });
       }
+    }
+  };
+  
+  // Special handling for base64 data URLs
+  const tryPlayBase64Audio = (dataUrl: string) => {
+    try {
+      // Convert base64 to blob
+      const byteString = atob(dataUrl.split(',')[1]);
+      const mimeString = dataUrl.split(',')[0].split(':')[1].split(';')[0];
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      
+      const blob = new Blob([ab], { type: mimeString });
+      const blobUrl = URL.createObjectURL(blob);
+      
+      if (audioRef.current) {
+        console.log("Playing from Blob URL:", blobUrl);
+        audioRef.current.src = blobUrl;
+        audioRef.current.load();
+        audioRef.current.play()
+          .then(() => {
+            setIsPaused(false);
+            setIsPlaying(true);
+            console.log("Base64 audio playing successfully");
+          })
+          .catch(e => {
+            console.error("Base64 play failed:", e);
+            setError("Could not play audio. Browser may not support this format.");
+          });
+      }
+    } catch (e) {
+      console.error("Error processing base64 audio:", e);
+      setError("Failed to process audio data.");
     }
   };
   
@@ -157,6 +241,10 @@ const AudioPlayer = ({ audioUrl, onEnded }: AudioPlayerProps) => {
   
   return (
     <div className="w-full px-4 py-3 rounded-lg bg-background/50 backdrop-blur-sm border border-border/50 transition-all duration-300 ease-out-expo animate-in animate-scale-in">
+      {error && (
+        <div className="text-red-500 text-sm mb-2 text-center">{error}</div>
+      )}
+      
       <div className="flex justify-center mb-2">
         <AudioWaveform isPlaying={isPlaying} isPaused={isPaused} />
       </div>
