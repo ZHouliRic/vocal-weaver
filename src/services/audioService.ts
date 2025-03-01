@@ -1,3 +1,4 @@
+
 import { Voice } from "../components/VoiceSelector";
 
 // Sample voice data
@@ -44,8 +45,8 @@ export const availableVoices: Voice[] = [
   }
 ];
 
-// API Configuration - Change this to your deployed API URL
-const PYTHON_API_URL = "https://your-deployed-python-api.com/generate-audio";
+// API Configuration - Using localhost for development
+const PYTHON_API_URL = "http://localhost:5000/generate-audio";
 // Set timeout duration for API calls in milliseconds
 const API_TIMEOUT = 10000;
 

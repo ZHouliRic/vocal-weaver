@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { MoreVertical, Trash2, Download, Copy, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,13 +48,50 @@ const AudioHistoryItem = ({
   };
   
   const handleDownload = () => {
-    const link = document.createElement("a");
-    link.href = item.audioUrl;
-    link.download = `audio-${item.id}.mp3`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Audio downloaded");
+    try {
+      if (item.audioUrl.startsWith('data:')) {
+        const base64Data = item.audioUrl.split(',')[1];
+        
+        const byteCharacters = atob(base64Data);
+        const byteArrays = [];
+        
+        for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+          const slice = byteCharacters.slice(offset, offset + 512);
+          
+          const byteNumbers = new Array(slice.length);
+          for (let i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+          }
+          
+          const byteArray = new Uint8Array(byteNumbers);
+          byteArrays.push(byteArray);
+        }
+        
+        const blob = new Blob(byteArrays, { type: 'audio/mpeg' });
+        const url = window.URL.createObjectURL(blob);
+        
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `audio-${item.id}.mp3`;
+        document.body.appendChild(link);
+        link.click();
+        
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+      } else {
+        const link = document.createElement("a");
+        link.href = item.audioUrl;
+        link.download = `audio-${item.id}.mp3`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      
+      toast.success("Audio downloaded");
+    } catch (error) {
+      console.error("Download failed:", error);
+      toast.error("Failed to download audio. Please try again.");
+    }
   };
   
   const truncateText = (text: string, maxLength: number) => {
