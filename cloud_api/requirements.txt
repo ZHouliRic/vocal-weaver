@@ -1,0 +1,7 @@
+
+flask==2.0.1
+flask-cors==3.0.10
+gtts==2.2.3
+gunicorn==20.1.0
+# Uncomment below if implementing ElevenLabs or other API-based services
+# requests==2.28.1
