@@ -190,8 +190,20 @@ const AudioPlayer = ({ audioUrl, onEnded }: AudioPlayerProps) => {
       // Try with different MIME types if one doesn't work
       const mimeTypes = ['audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/aac'];
       let audioBlob = null;
+      let playSuccessful = false;
       
-      for (const mimeType of mimeTypes) {
+      // We need to handle the MIME types sequentially
+      const tryMimeType = (index: number) => {
+        if (index >= mimeTypes.length || playSuccessful) {
+          // We've either tried all MIME types or found a successful one
+          if (!playSuccessful && !audioBlob) {
+            tryFallbackAudio();
+          }
+          return;
+        }
+        
+        const mimeType = mimeTypes[index];
+        
         try {
           audioBlob = new Blob([byteArray], { type: mimeType });
           const blobUrl = URL.createObjectURL(audioBlob);
@@ -207,22 +219,29 @@ const AudioPlayer = ({ audioUrl, onEnded }: AudioPlayerProps) => {
                 setIsPaused(false);
                 setIsPlaying(true);
                 console.log(`Audio playing successfully with ${mimeType}`);
-                break; // Exit the loop if successful
+                playSuccessful = true; // Mark as successful instead of using break
               })
               .catch(e => {
                 console.error(`Failed to play with ${mimeType}:`, e);
                 URL.revokeObjectURL(blobUrl); // Clean up
-                // Continue to next MIME type
+                // Try the next MIME type
+                tryMimeType(index + 1);
               });
+          } else {
+            tryMimeType(index + 1);
           }
         } catch (error) {
           console.error(`Error with ${mimeType}:`, error);
-          // Continue to next MIME type
+          // Try the next MIME type
+          tryMimeType(index + 1);
         }
-      }
+      };
+      
+      // Start trying the first MIME type
+      tryMimeType(0);
       
       // If all MIME types failed, try a different approach
-      if (!audioBlob) {
+      const tryFallbackAudio = () => {
         // Create an Audio object with the original URL as a fallback
         const fallbackAudio = new Audio(dataUrl);
         fallbackAudio.play()
@@ -250,7 +269,7 @@ const AudioPlayer = ({ audioUrl, onEnded }: AudioPlayerProps) => {
             console.error("All fallback methods failed:", e);
             setError("Could not play audio. Browser may not support this format.");
           });
-      }
+      };
     } catch (e) {
       console.error("Error processing base64 audio:", e);
       setError("Failed to process audio data.");
