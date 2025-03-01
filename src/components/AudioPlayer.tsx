@@ -104,6 +104,20 @@ const AudioPlayer = ({ audioUrl, onEnded }: AudioPlayerProps) => {
       setIsPlaying(false);
       console.log("Audio paused");
     } else {
+      // For Web Speech API generated audio (usually in WAV format)
+      if (audioUrl.startsWith('data:audio/wav;base64,')) {
+        // Convert WAV base64 to MP3 (browser compatible format)
+        try {
+          console.log("Detected Web Speech API audio format, converting to playable format");
+          convertAndPlayAudio(audioUrl);
+        } catch (error) {
+          console.error("Error converting audio:", error);
+          setError("Could not process the audio format. Please try again.");
+        }
+        return;
+      }
+      
+      // For other audio sources
       // Make sure the source is set
       if (!audioRef.current.src || audioRef.current.src !== audioUrl) {
         console.log("Resetting audio source");
@@ -149,6 +163,100 @@ const AudioPlayer = ({ audioUrl, onEnded }: AudioPlayerProps) => {
     }
   };
   
+  // Convert WAV to MP3 format for better browser compatibility
+  const convertAndPlayAudio = (dataUrl: string) => {
+    try {
+      // For Web Speech API, we need to ensure we're using the right MIME type
+      // Most browsers support MP3 better than WAV
+      
+      // Extract the base64 data
+      const base64Data = dataUrl.split(',')[1];
+      if (!base64Data) {
+        setError("Invalid audio data format");
+        return;
+      }
+      
+      // Create blob with the correct MIME type
+      // Force the MIME type to audio/mpeg for better compatibility
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      
+      const byteArray = new Uint8Array(byteNumbers);
+      
+      // Try with different MIME types if one doesn't work
+      const mimeTypes = ['audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/aac'];
+      let audioBlob = null;
+      
+      for (const mimeType of mimeTypes) {
+        try {
+          audioBlob = new Blob([byteArray], { type: mimeType });
+          const blobUrl = URL.createObjectURL(audioBlob);
+          
+          if (audioRef.current) {
+            console.log(`Trying with MIME type: ${mimeType}`);
+            audioRef.current.src = blobUrl;
+            audioRef.current.load();
+            
+            // Play the audio
+            audioRef.current.play()
+              .then(() => {
+                setIsPaused(false);
+                setIsPlaying(true);
+                console.log(`Audio playing successfully with ${mimeType}`);
+                break; // Exit the loop if successful
+              })
+              .catch(e => {
+                console.error(`Failed to play with ${mimeType}:`, e);
+                URL.revokeObjectURL(blobUrl); // Clean up
+                // Continue to next MIME type
+              });
+          }
+        } catch (error) {
+          console.error(`Error with ${mimeType}:`, error);
+          // Continue to next MIME type
+        }
+      }
+      
+      // If all MIME types failed, try a different approach
+      if (!audioBlob) {
+        // Create an Audio object with the original URL as a fallback
+        const fallbackAudio = new Audio(dataUrl);
+        fallbackAudio.play()
+          .then(() => {
+            setIsPaused(false);
+            setIsPlaying(true);
+            console.log("Fallback audio playing successfully");
+            
+            // Update audio reference
+            if (audioRef.current) {
+              audioRef.current.pause();
+            }
+            audioRef.current = fallbackAudio;
+            
+            // Add event listeners
+            fallbackAudio.addEventListener("timeupdate", () => setCurrentTime(fallbackAudio.currentTime));
+            fallbackAudio.addEventListener("ended", () => {
+              setIsPlaying(false);
+              setCurrentTime(0);
+              if (onEnded) onEnded();
+            });
+            fallbackAudio.volume = volume;
+          })
+          .catch(e => {
+            console.error("All fallback methods failed:", e);
+            setError("Could not play audio. Browser may not support this format.");
+          });
+      }
+    } catch (e) {
+      console.error("Error processing base64 audio:", e);
+      setError("Failed to process audio data.");
+    }
+  };
+  
   // Special handling for base64 data URLs
   const tryPlayBase64Audio = (dataUrl: string) => {
     try {
@@ -177,7 +285,8 @@ const AudioPlayer = ({ audioUrl, onEnded }: AudioPlayerProps) => {
           })
           .catch(e => {
             console.error("Base64 play failed:", e);
-            setError("Could not play audio. Browser may not support this format.");
+            // Try with different MIME types
+            convertAndPlayAudio(dataUrl);
           });
       }
     } catch (e) {

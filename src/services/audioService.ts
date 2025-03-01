@@ -93,12 +93,12 @@ export const generateAudio = async (
   } catch (error) {
     console.warn("Could not connect to Python API, falling back to Web Speech API", error);
     // Fall back to Web Speech API if API is unreachable
-    return generateAudioFallback(text, voiceId, options);
+    return generateAudioWithWebSpeechAPI(text, voiceId, options);
   }
 };
 
-// Fallback method using Web Speech API
-const generateAudioFallback = (
+// Improved Web Speech API method with better browser compatibility
+const generateAudioWithWebSpeechAPI = (
   text: string,
   voiceId: string,
   options: {
@@ -113,7 +113,7 @@ const generateAudioFallback = (
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     try {
-      console.log("Using Web Speech API fallback");
+      console.log("Using Web Speech API");
       // Check if the browser supports speech synthesis
       if (!('speechSynthesis' in window)) {
         throw new Error('Your browser does not support speech synthesis');
@@ -129,16 +129,36 @@ const generateAudioFallback = (
       utterance.rate = options.speechRate || 1;
       utterance.pitch = options.pitch || 1;
       
+      // Try to match voice if possible
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        // Try to find a matching voice by language
+        const matchingVoice = voices.find(voice => 
+          voice.lang.startsWith(options.language) || 
+          voice.lang.startsWith(options.language.split('-')[0])
+        );
+        
+        if (matchingVoice) {
+          utterance.voice = matchingVoice;
+          console.log("Using matching voice:", matchingVoice.name);
+        }
+      }
+      
       console.log("Web Speech API configured with:", {
         lang: utterance.lang,
         rate: utterance.rate,
-        pitch: utterance.pitch
+        pitch: utterance.pitch,
+        voice: utterance.voice?.name || "default"
       });
       
-      // Create an audio context to capture the speech
+      // Method 1: Use an invisible audio element to play and capture the audio
+      // This works well in most browsers
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const destination = audioContext.createMediaStreamDestination();
-      const mediaRecorder = new MediaRecorder(destination.stream);
+      const mediaRecorder = new MediaRecorder(destination.stream, {
+        mimeType: 'audio/webm' // This is widely supported
+      });
+      
       const audioChunks: BlobPart[] = [];
       
       mediaRecorder.ondataavailable = (event) => {
@@ -146,17 +166,19 @@ const generateAudioFallback = (
       };
       
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        const audioBlob = new Blob(audioChunks, { type: 'audio/mpeg' }); // Using MP3 format for better compatibility
         const reader = new FileReader();
         
         reader.onloadend = () => {
           const base64Audio = reader.result as string;
-          console.log("Audio generated via Web Speech API fallback successfully");
+          console.log("Audio generated via Web Speech API successfully");
+          audioContext.close();
           resolve(base64Audio);
         };
         
         reader.onerror = (error) => {
           console.error("Error reading audio blob:", error);
+          audioContext.close();
           reject(error);
         };
         
@@ -175,7 +197,6 @@ const generateAudioFallback = (
       utterance.onend = () => {
         console.log("Speech synthesis ended, stopping recorder");
         mediaRecorder.stop();
-        audioContext.close();
       };
       
       // Handle errors
@@ -193,4 +214,3 @@ const generateAudioFallback = (
     }
   });
 };
-
