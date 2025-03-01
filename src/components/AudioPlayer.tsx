@@ -19,32 +19,47 @@ const AudioPlayer = ({ audioUrl, onEnded }: AudioPlayerProps) => {
   const [volume, setVolume] = useState(0.75);
   const [isMuted, setIsMuted] = useState(false);
 
+  // Reset state when audioUrl changes
   useEffect(() => {
+    setIsPlaying(false);
+    setIsPaused(false);
+    setCurrentTime(0);
+  }, [audioUrl]);
+
+  useEffect(() => {
+    // Create new audio element
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
     
-    audio.addEventListener("loadedmetadata", () => {
+    const handleLoadedMetadata = () => {
       setDuration(audio.duration);
-    });
+    };
     
-    audio.addEventListener("timeupdate", () => {
+    const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
-    });
+    };
     
-    audio.addEventListener("ended", () => {
+    const handleEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
       if (onEnded) onEnded();
-    });
+    };
     
+    // Add event listeners
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("ended", handleEnded);
+    
+    // Set initial volume
     audio.volume = volume;
     
+    // Cleanup function
     return () => {
       audio.pause();
       audio.src = "";
-      audio.removeEventListener("loadedmetadata", () => {});
-      audio.removeEventListener("timeupdate", () => {});
-      audio.removeEventListener("ended", () => {});
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("ended", handleEnded);
     };
   }, [audioUrl, onEnded]);
   
@@ -55,11 +70,36 @@ const AudioPlayer = ({ audioUrl, onEnded }: AudioPlayerProps) => {
       audioRef.current.pause();
       setIsPaused(true);
     } else {
-      audioRef.current.play();
-      setIsPaused(false);
+      // Explicitly set the current src again to ensure it's loaded
+      if (!audioRef.current.src || audioRef.current.src !== audioUrl) {
+        audioRef.current.src = audioUrl;
+      }
+      
+      // Play with a promise to catch any errors
+      const playPromise = audioRef.current.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPaused(false);
+            setIsPlaying(true);
+          })
+          .catch(error => {
+            console.error("Play failed:", error);
+            // Try a fallback method for mobile devices
+            setTimeout(() => {
+              if (audioRef.current) {
+                audioRef.current.play()
+                  .then(() => {
+                    setIsPaused(false);
+                    setIsPlaying(true);
+                  })
+                  .catch(e => console.error("Fallback play failed:", e));
+              }
+            }, 100);
+          });
+      }
     }
-    
-    setIsPlaying(!isPlaying);
   };
   
   const seekTo = (time: number) => {
