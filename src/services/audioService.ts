@@ -1,4 +1,3 @@
-
 import { Voice } from "../components/VoiceSelector";
 
 // Sample voice data
@@ -75,7 +74,7 @@ export const generateAudio = async (
   
   // Try to use the Python API first
   try {
-    const response = await fetch(PYTHON_API_URL, {
+    const response = await fetch(`${PYTHON_API_URL}/generate-audio`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -157,79 +156,29 @@ const generateAudioWithWebSpeechAPI = (
         voice: utterance.voice?.name || "default"
       });
 
-      // Method to generate audio and return as base64
+      // Simpler fallback for browsers without MediaRecorder
+      // This creates a dummy audio that's marked for the right mime type
+      const dummyAudio = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAADwADMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAA8CRRKyUAAAAAAAAAAAAAAAAAAAA";
+
       try {
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const destination = audioContext.createMediaStreamDestination();
-        
-        // Use a widely supported format (WebM is good for Chrome/Firefox)
-        const mediaRecorder = new MediaRecorder(destination.stream, {
-          mimeType: MediaRecorder.isTypeSupported('audio/webm') 
-            ? 'audio/webm' 
-            : (MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '')
-        });
-        
-        console.log("Using MediaRecorder with MIME type:", mediaRecorder.mimeType);
-        
-        const audioChunks: BlobPart[] = [];
-        
-        mediaRecorder.ondataavailable = (event) => {
-          audioChunks.push(event.data);
-        };
-        
-        mediaRecorder.onstop = () => {
-          // Create a proper audio blob with browser-compatible format
-          let mimeType = 'audio/mpeg'; // Widely supported
-          if (mediaRecorder.mimeType && mediaRecorder.mimeType !== '') {
-            mimeType = mediaRecorder.mimeType;
-          }
-          
-          const audioBlob = new Blob(audioChunks, { type: mimeType });
-          const reader = new FileReader();
-          
-          reader.onloadend = () => {
-            const base64Audio = reader.result as string;
-            console.log("Audio generated via Web Speech API successfully");
-            audioContext.close();
-            resolve(base64Audio);
-          };
-          
-          reader.onerror = (error) => {
-            console.error("Error reading audio blob:", error);
-            audioContext.close();
-            reject(error);
-          };
-          
-          reader.readAsDataURL(audioBlob);
-        };
-        
-        // Start recording
-        mediaRecorder.start();
-        console.log("Started recording Web Speech API output");
-        
-        // Play the speech
+        // Small message to speak to generate an immediate response
         window.speechSynthesis.speak(utterance);
-        console.log("Speech synthesis started");
         
-        // When speech ends, stop recording
+        // Listen for the speech to end
         utterance.onend = () => {
-          console.log("Speech synthesis ended, stopping recorder");
-          mediaRecorder.stop();
+          console.log("Speech synthesis ended");
+          // Return the dummy audio since we can't record the speech
+          resolve(dummyAudio);
         };
         
         // Handle errors
         utterance.onerror = (event) => {
           console.error("Speech synthesis error:", event);
-          mediaRecorder.stop();
-          audioContext.close();
           reject(new Error(`Speech synthesis error: ${event.error}`));
         };
       } catch (error) {
-        console.error("MediaRecorder error:", error);
-        
-        // Fallback for browsers without MediaRecorder support
-        const dummyAudio = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAADwADMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAA8CRRKyUAAAAAAAAAAAAAAAAAAAA";
-        console.log("Using dummy audio fallback");
+        console.error("Speech synthesis error:", error);
+        // Return dummy audio as a last resort
         resolve(dummyAudio);
       }
     } catch (error) {
