@@ -47,7 +47,7 @@ export const availableVoices: Voice[] = [
 
 // API Configuration - Using Cloud Run URL
 // Update this with your actual Cloud Run URL after deployment
-const PYTHON_API_URL = "https://tts-api-xxxxxxxxxxxx-uc.a.run.app/generate-audio";
+const PYTHON_API_URL = "https://tts-api-493811274849.us-central1.run.app";
 // Set timeout duration for API calls in milliseconds
 const API_TIMEOUT = 10000;
 
