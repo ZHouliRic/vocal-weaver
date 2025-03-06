@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import base64
@@ -39,7 +38,7 @@ def generate_audio():
 # This is the main entry point for many cloud services
 if __name__ == '__main__':
     # Get port from environment variable (for cloud deployment)
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
 
 # Customize this section with your own TTS logic
