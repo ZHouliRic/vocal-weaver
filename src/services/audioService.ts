@@ -1,3 +1,4 @@
+
 import { Voice } from "../components/VoiceSelector";
 
 // Sample voice data
@@ -45,7 +46,7 @@ export const availableVoices: Voice[] = [
 ];
 
 // API Configuration - Using Cloud Run URL
-// Change this when you deploy to Cloud Run
+// Update this with your actual Cloud Run URL after deployment
 const PYTHON_API_URL = "https://tts-api-xxxxxxxxxxxx-uc.a.run.app/generate-audio";
 // Set timeout duration for API calls in milliseconds
 const API_TIMEOUT = 10000;

@@ -4,7 +4,7 @@
 # Exit on any error
 set -e
 
-# Replace with your actual Google Cloud Project ID
+# Your Google Cloud Project ID
 PROJECT_ID="logical-cubist-381408"
 
 echo "Starting deployment to Google Cloud Run for project: $PROJECT_ID"

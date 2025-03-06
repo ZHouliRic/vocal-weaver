@@ -1,3 +1,4 @@
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import base64
@@ -40,42 +41,3 @@ if __name__ == '__main__':
     # Get port from environment variable (for cloud deployment)
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
-
-# Customize this section with your own TTS logic
-# You can replace gTTS with any other TTS library or service like:
-# - ElevenLabs API
-# - Amazon Polly
-# - Google Text-to-Speech
-# - Microsoft Azure TTS
-# Example with ElevenLabs:
-"""
-import requests
-
-def generate_with_elevenlabs(text, voice_id, options):
-    ELEVEN_LABS_API_KEY = "your-api-key"  # Better to use environment variables
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-    
-    headers = {
-        "xi-api-key": ELEVEN_LABS_API_KEY,
-        "Content-Type": "application/json"
-    }
-    
-    data = {
-        "text": text,
-        "model_id": "eleven_monolingual_v1",
-        "voice_settings": {
-            "stability": options.get("stability", 0.5),
-            "similarity_boost": options.get("similarityBoost", 0.75)
-        }
-    }
-    
-    response = requests.post(url, json=data, headers=headers)
-    
-    if response.status_code != 200:
-        raise Exception(f"Failed to generate audio: {response.text}")
-    
-    audio_data = response.content
-    audio_base64 = base64.b64encode(audio_data).decode("utf-8")
-    
-    return f"data:audio/mpeg;base64,{audio_base64}"
-"""
