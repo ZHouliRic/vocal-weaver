@@ -24,13 +24,22 @@ heroku open
 
 ### 2. Google Cloud Run
 
-```
-# Build the container
-gcloud builds submit --tag gcr.io/YOUR-PROJECT-ID/tts-api
+For easy deployment to Google Cloud Run, use the provided script:
 
-# Deploy to Cloud Run
-gcloud run deploy tts-api --image gcr.io/YOUR-PROJECT-ID/tts-api --platform managed
+```bash
+# Make the script executable
+chmod +x deploy.sh
+
+# Run the deployment script
+./deploy.sh
 ```
+
+The script will:
+1. Build and submit your container image
+2. Deploy it to Cloud Run
+3. Show you the deployed URL to use in your React app
+
+After deployment, update the PYTHON_API_URL in your React app (src/services/audioService.ts) with the URL provided by the script.
 
 ### 3. AWS Elastic Beanstalk
 
