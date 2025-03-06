@@ -1,4 +1,3 @@
-
 import { RefObject } from "react";
 
 // Format seconds to mm:ss format
@@ -148,5 +147,84 @@ export const setupMediaSession = (
         audioRef.current.currentTime = details.seekTime;
       });
     }
+  }
+};
+
+// Play base64 encoded audio
+export const playBase64Audio = (
+  base64Data: string,
+  audioRef: RefObject<HTMLAudioElement>,
+  callbacks: {
+    onPlayStart?: () => void;
+    onPlayError?: (errorMsg: string) => void;
+    onTimeUpdate?: (currentTime: number) => void;
+    onPlayEnd?: () => void;
+    setCurrentVolume?: (volume: number) => void;
+  }
+): void => {
+  const { onPlayStart, onPlayError, onTimeUpdate, onPlayEnd, setCurrentVolume } = callbacks;
+  
+  if (!audioRef.current) {
+    if (onPlayError) onPlayError("Audio element not available");
+    return;
+  }
+  
+  // Check if the data URL is valid
+  if (!base64Data || !base64Data.startsWith('data:audio/')) {
+    if (onPlayError) onPlayError("Invalid audio data");
+    return;
+  }
+  
+  try {
+    // Set the source to the base64 data
+    audioRef.current.src = base64Data;
+    
+    // Set up event handlers
+    const handlePlay = () => {
+      if (onPlayStart) onPlayStart();
+    };
+    
+    const handleTimeUpdate = () => {
+      if (audioRef.current && onTimeUpdate) {
+        onTimeUpdate(audioRef.current.currentTime);
+      }
+    };
+    
+    const handleEnded = () => {
+      if (onPlayEnd) onPlayEnd();
+      
+      // Clean up event listeners
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('play', handlePlay);
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+        audioRef.current.removeEventListener('ended', handleEnded);
+      }
+    };
+    
+    // Check if volume can be set
+    if (audioRef.current && setCurrentVolume) {
+      setCurrentVolume(audioRef.current.volume);
+    }
+    
+    // Add the event listeners
+    audioRef.current.addEventListener('play', handlePlay);
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+    audioRef.current.addEventListener('ended', handleEnded);
+    
+    // Try to play the audio
+    audioRef.current.load();
+    
+    audioRef.current.play()
+      .then(() => {
+        if (onPlayStart) onPlayStart();
+      })
+      .catch((error) => {
+        console.error("Error playing base64 audio:", error);
+        if (onPlayError) onPlayError("Couldn't play audio: " + error.message);
+      });
+    
+  } catch (error) {
+    console.error("Exception playing base64 audio:", error);
+    if (onPlayError) onPlayError("Couldn't process audio data");
   }
 };
