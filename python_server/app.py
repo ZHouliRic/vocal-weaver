@@ -11,6 +11,7 @@ CORS(app)  # Enable CORS for all routes
 
 @app.route('/', methods=['GET'])
 def home():
+    # ... keep existing code (HTML homepage)
     return """
     <html>
     <head>
@@ -101,6 +102,7 @@ def home():
 @app.route('/generate-audio', methods=['POST'])
 def generate_audio():
     try:
+        # Get the JSON data from the request
         data = request.json
         
         if not data:
@@ -110,6 +112,10 @@ def generate_audio():
         voice_id = data.get('voiceId', '')
         options = data.get('options', {})
         
+        # Input validation
+        if not text:
+            return jsonify({"error": "Text is required"}), 400
+            
         # Get language from options or default to English
         language = options.get('language', 'en')
         
@@ -129,10 +135,13 @@ def generate_audio():
             'audioUrl': f'data:audio/mpeg;base64,{audio_base64}'
         })
     except Exception as e:
+        import traceback
+        print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @app.route('/generate-audio', methods=['GET'])
 def generate_audio_get():
+    # ... keep existing code (HTML error page)
     return """
     <html>
     <head>
@@ -154,7 +163,14 @@ def generate_audio_get():
     </html>
     """
 
+# Health check endpoint for cloud services
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
 if __name__ == '__main__':
     # Get port from environment variable (for cloud deployment)
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    # In production, turn off debug mode
+    debug = os.environ.get('FLASK_ENV') == 'development'
+    app.run(host='0.0.0.0', port=port, debug=debug)
